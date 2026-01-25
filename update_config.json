@@ -1,0 +1,13 @@
+{
+    "auto_update": true,
+    "check_interval": 3600,
+    "last_check": 0,
+    "update_channel": "stable",
+    "update_server": "https://raw.githubusercontent.com/rana-editz/mbot-updates/main/",
+    "encryption_key": "",
+    "verify_signatures": true,
+    "backup_before_update": true,
+    "notify_on_update": true,
+    "force_update": false,
+    "update_history": []
+}
