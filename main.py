@@ -386,10 +386,12 @@ class MBOT:
         try:
             # Initialize Telegram client
             self.client = TelegramClient(
-                'mbot_session',
-                api_id=2040,  # You need to get this from my.telegram.org
-                api_hash='b18441a1ff607e10a989891a5462e627'  # You need to get this from my.telegram.org
-            ).start(bot_token=CONFIG['bot_token'])
+    'mbot_session',
+    api_id=2040,
+    api_hash='b18441a1ff607e10a989891a5462e627'
+)
+
+await self.client.start(bot_token=CONFIG['bot_token'])
             
             logger.info("Telegram bot started successfully")
             
