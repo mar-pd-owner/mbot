@@ -1,20 +1,17 @@
 {
-  "telegram_token": "YOUR_BOT_TOKEN_HERE",
-  "admin_ids": [123456789],
-  "tiktok": {
-    "endpoints": [
-      "https://api16-core-c-alisg.tiktokv.com",
-      "https://api19-core-c-alisg.tiktokv.com"
-    ],
-    "batch_size": 10,
-    "delay_between": 1.5,
-    "max_retries": 5,
-    "timeout": 15
-  },
-  "limits": {
-    "max_likes_per_video": 500,
-    "max_videos_per_hour": 50,
-    "cooldown": 3,
-    "daily_limit": 2000
-  }
+    "bot_token": "YOUR_BOT_TOKEN_HERE",
+    "owner_id": 6454347745,
+    "owner_username": "@rana_editz_00",
+    "version": 1,
+    "max_threads": 100,
+    "proxy_enabled": false,
+    "proxy_type": "http",
+    "proxy_auth": false,
+    "proxy_credential": "",
+    "max_requests_per_minute": 3000,
+    "boost_speed": "ultra",
+    "security_level": "high",
+    "auto_restart": true,
+    "log_activity": true,
+    "hide_owner": true
 }
