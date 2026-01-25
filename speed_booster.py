@@ -6,6 +6,8 @@ Optimized for 500+ likes in seconds
 import asyncio
 import time
 import threading
+import random
+import hashlib  # ADDED THIS IMPORT
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
 
@@ -90,10 +92,6 @@ class SpeedBooster:
     
     def _generate_device_data(self):
         """Generate device data"""
-        import random
-        import time
-        import hashlib
-        
         return {
             'device_id': str(random.randint(1000000000000000000, 9999999999999999999)),
             'timestamp': int(time.time() * 1000)
@@ -101,8 +99,6 @@ class SpeedBooster:
     
     def _generate_headers(self, device):
         """Generate headers"""
-        import random
-        
         return {
             'X-Device-ID': device['device_id'],
             'X-Timestamp': str(device['timestamp']),
