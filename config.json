@@ -1,0 +1,28 @@
+{
+  "telegram_token": "YOUR_TELEGRAM_BOT_TOKEN",
+  "tiktok": {
+    "api_endpoints": [
+      "https://api16-normal-c-useast1a.tiktokv.com",
+      "https://api19-normal-c-useast1a.tiktokv.com",
+      "https://api22-normal-c-useast2a.tiktokv.com"
+    ],
+    "batch_size": 25,
+    "max_concurrent": 50,
+    "request_timeout": 30
+  },
+  "devices": {
+    "file": "devices.txt",
+    "rotation": true,
+    "max_devices": 1000
+  },
+  "proxies": {
+    "file": "proxies.txt",
+    "rotation": true,
+    "check_interval": 60
+  },
+  "limits": {
+    "max_likes_per_video": 1000,
+    "max_videos_per_hour": 50,
+    "cooldown_per_video": 1
+  }
+}
