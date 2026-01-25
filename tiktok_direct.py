@@ -7,7 +7,7 @@ import aiohttp
 import asyncio
 import time
 import random
-import hashlib
+import hashlib  # ADDED THIS IMPORT
 import json
 from typing import Dict, Optional, List
 import urllib.parse
