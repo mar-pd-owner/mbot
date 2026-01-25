@@ -5,7 +5,7 @@ Manage and rotate device fingerprints
 
 import time
 import random
-import hashlib
+import hashlib  # ADDED THIS IMPORT
 import json
 from typing import Dict, List
 from datetime import datetime, timedelta
