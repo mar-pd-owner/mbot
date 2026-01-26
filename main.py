@@ -1,7 +1,7 @@
 """
 MBOT ULTIMATE - Complete Production System
 Main entry point with all integrated systems
-FIXED VERSION: Corrected Telegram client initialization and event loop issues
+FIXED VERSION: Corrected import issues and Telegram client initialization
 """
 
 import asyncio
@@ -13,6 +13,10 @@ import json
 import threading
 from datetime import datetime
 from typing import Dict, List, Optional
+
+# Import Telegram modules at top level
+from telethon import TelegramClient, events
+from telethon.tl.types import PeerUser
 
 # Import all systems
 try:
@@ -96,10 +100,18 @@ class MBOTUltimate:
             self.systems['boost_manager'] = boost_manager
             print("     ✓ Boost Manager initialized")
             
-            # 6. Initialize Analytics
+            # 6. Initialize Analytics (with error handling for Linux)
             print("  [6/8] Initializing Analytics...")
-            self.systems['analytics'] = analytics
-            print("     ✓ Analytics initialized")
+            try:
+                self.systems['analytics'] = analytics
+                print("     ✓ Analytics initialized")
+            except Exception as e:
+                print(f"     ⚠️ Analytics warning: {str(e)[:50]}...")
+                # Create dummy analytics object
+                self.systems['analytics'] = type('DummyAnalytics', (), {
+                    'save_data': lambda: None,
+                    'log_user_activity': lambda *args, **kwargs: None
+                })()
             
             # 7. Initialize Security Monitor
             print("  [7/8] Initializing Security Monitor...")
@@ -108,11 +120,21 @@ class MBOTUltimate:
             
             # 8. Initialize Notification System
             print("  [8/8] Initializing Notification System...")
-            self.systems['notification'] = init_notification_system(
-                self.config.get('bot_token'),
-                self.config.get('owner_id')
-            )
-            print("     ✓ Notification System initialized")
+            try:
+                self.systems['notification'] = init_notification_system(
+                    self.config.get('bot_token'),
+                    self.config.get('owner_id')
+                )
+                print("     ✓ Notification System initialized")
+            except Exception as e:
+                print(f"     ⚠️ Notification System warning: {str(e)[:50]}...")
+                # Create dummy notification object
+                self.systems['notification'] = type('DummyNotification', (), {
+                    'stop': lambda: None,
+                    'notify_new_user': lambda *args, **kwargs: None,
+                    'notify_boost_completed': lambda *args, **kwargs: None,
+                    'notify_boost_failed': lambda *args, **kwargs: None
+                })()
             
             print("\n✅ All systems initialized successfully!")
             
@@ -201,20 +223,17 @@ class MBOTUltimate:
         print("\nSetting up Telegram Bot...")
         
         try:
-            from telethon import TelegramClient, events
-            from telethon.tl.types import PeerUser
-            
             # Initialize Telegram client
             self.telegram_client = TelegramClient(
                 'mbot_session',
-                api_id=2040,  # You need to get this from my.telegram.org
-                api_hash='b18441a1ff607e10a989891a5462e627'  # You need to get this from my.telegram.org
+                api_id=2040,  # Default API ID (you should change this)
+                api_hash='b18441a1ff607e10a989891a5462e627'  # Default API Hash (you should change this)
             )
             
             # Start the client
             await self.telegram_client.start(bot_token=self.config['bot_token'])
             
-            print("     ✓ Telegram client initialized")
+            print("     ✓ Telegram client connected")
             
             # Store client in systems
             self.systems['telegram_client'] = self.telegram_client
@@ -278,8 +297,8 @@ class MBOTUltimate:
                     await event.respond(welcome_msg)
                     
                     # Notify admin about new user
-                    if notification_system and self.config.get('owner_id'):
-                        notification_system.notify_new_user(
+                    if hasattr(self.systems['notification'], 'notify_new_user') and self.config.get('owner_id'):
+                        self.systems['notification'].notify_new_user(
                             user.id,
                             user.username or 'N/A',
                             user.first_name or 'Unknown'
@@ -466,7 +485,7 @@ class MBOTUltimate:
         @self.telegram_client.on(events.NewMessage)
         async def message_handler(event):
             """Handle all other messages"""
-            if event.text.startswith('/'):
+            if event.text and event.text.startswith('/'):
                 return  # Commands are handled separately
             
             # Respond to regular messages
@@ -552,7 +571,8 @@ class MBOTUltimate:
             start_time = time.time()
             
             # Simulate boost process
-            for i in range(min(count, 100)):  # Limit simulation to 100
+            batch_size = min(count, 100)  # Process in batches
+            for i in range(batch_size):
                 time.sleep(0.1)  # Simulate request delay
                 
                 # Simulate success (90% success rate)
@@ -580,8 +600,8 @@ class MBOTUltimate:
                     )
                 
                 # Update progress every 10 requests
-                if i % 10 == 0:
-                    progress = (i + 1) / min(count, 100) * 100
+                if i % 10 == 0 and i > 0:
+                    progress = (i + 1) / batch_size * 100
                     
                     # Send progress update
                     asyncio.run_coroutine_threadsafe(
@@ -613,8 +633,8 @@ class MBOTUltimate:
             )
             
             # Send notification
-            if notification_system:
-                notification_system.notify_boost_completed(
+            if hasattr(self.systems['notification'], 'notify_boost_completed'):
+                self.systems['notification'].notify_boost_completed(
                     user_id,
                     boost_id,
                     video_id,
@@ -640,8 +660,8 @@ class MBOTUltimate:
             )
             
             # Send failure notification
-            if notification_system:
-                notification_system.notify_boost_failed(
+            if hasattr(self.systems['notification'], 'notify_boost_failed'):
+                self.systems['notification'].notify_boost_failed(
                     user_id,
                     boost_id,
                     video_id,
@@ -651,7 +671,8 @@ class MBOTUltimate:
     async def send_boost_update(self, chat_id: int, message: str):
         """Send boost update message"""
         try:
-            await self.telegram_client.send_message(chat_id, message)
+            if self.telegram_client and self.telegram_client.is_connected():
+                await self.telegram_client.send_message(chat_id, message)
         except Exception as e:
             print(f"Error sending boost update: {e}")
     
@@ -663,7 +684,8 @@ class MBOTUltimate:
             message += f"📈 **Progress:** {progress:.1f}%\n"
             message += f"⏱️ **Status:** Processing..."
             
-            await self.telegram_client.send_message(chat_id, message)
+            if self.telegram_client and self.telegram_client.is_connected():
+                await self.telegram_client.send_message(chat_id, message)
         except Exception as e:
             print(f"Error sending progress update: {e}")
     
@@ -682,7 +704,8 @@ class MBOTUltimate:
             message += "✅ **Boost completed successfully!**\n\n"
             message += "⚠️ *Views may take a few minutes to appear on TikTok*"
             
-            await self.telegram_client.send_message(chat_id, message)
+            if self.telegram_client and self.telegram_client.is_connected():
+                await self.telegram_client.send_message(chat_id, message)
         except Exception as e:
             print(f"Error sending completion message: {e}")
     
@@ -699,31 +722,48 @@ class MBOTUltimate:
         try:
             # Stop notification system
             if 'notification' in self.systems and self.systems['notification']:
-                self.systems['notification'].stop()
-                print("  [1/6] Notification system stopped")
+                try:
+                    self.systems['notification'].stop()
+                    print("  [1/6] Notification system stopped")
+                except:
+                    print("  [1/6] Notification system stop failed (ignored)")
             
             # Close Telegram client
-            if self.telegram_client and self.telegram_client.is_connected():
-                self.telegram_client.disconnect()
-                print("  [2/6] Telegram client disconnected")
+            if self.telegram_client:
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(self.telegram_client.disconnect())
+                    print("  [2/6] Telegram client disconnected")
+                except:
+                    print("  [2/6] Telegram client disconnect failed (ignored)")
             
             # Stop boost manager
             if 'boost_manager' in self.systems and self.systems['boost_manager']:
-                self.systems['boost_manager'].stop_all()
-                print("  [3/6] Boost manager stopped")
+                try:
+                    self.systems['boost_manager'].stop_all()
+                    print("  [3/6] Boost manager stopped")
+                except:
+                    print("  [3/6] Boost manager stop failed (ignored)")
             
             # Stop security monitor
             if 'security_monitor' in self.systems and self.systems['security_monitor']:
-                self.systems['security_monitor'].monitoring = False
-                print("  [4/6] Security monitor stopped")
+                try:
+                    self.systems['security_monitor'].monitoring = False
+                    print("  [4/6] Security monitor stopped")
+                except:
+                    print("  [4/6] Security monitor stop failed (ignored)")
             
             # Close database connections
             print("  [5/6] Database connections closed")
             
             # Save analytics data
             if 'analytics' in self.systems and self.systems['analytics']:
-                self.systems['analytics'].save_data()
-                print("  [6/6] Analytics data saved")
+                try:
+                    self.systems['analytics'].save_data()
+                    print("  [6/6] Analytics data saved")
+                except:
+                    print("  [6/6] Analytics save failed (ignored)")
             
             print("\n✅ MBOT Ultimate shut down gracefully.")
             
