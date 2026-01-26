@@ -392,6 +392,8 @@ class MBOT:
 )
 
 await self.client.start(bot_token=CONFIG['bot_token'])
+except Exception as e:
+    print(f"Bot start error: {e}")
             
             logger.info("Telegram bot started successfully")
             
