@@ -3,7 +3,6 @@ const winston = require('winston');
 const path = require('path');
 const fs = require('fs');
 
-// Create logs directory
 const logDir = path.join(__dirname, 'data', 'logs');
 if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
