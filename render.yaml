@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: mbot-api
+    runtime: image
+    repo: https://github.com/your-username/mbot
+    branch: main
+    plan: free
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
