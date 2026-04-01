@@ -1,7 +1,7 @@
 {
-  "name": "mbot-professional",
-  "version": "4.0.0",
-  "description": "Professional TikTok Automation Bot by MAR-PD",
+  "name": "mbot-ultimate-powerful",
+  "version": "6.0.0",
+  "description": "Ultimate Powerful TikTok Mass Report Bot by MAR-PD",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -19,11 +19,6 @@
     "express-rate-limit": "^7.1.5",
     "winston": "^3.11.0",
     "crypto-js": "^4.2.0",
-    "node-fetch": "^3.3.2",
-    "cheerio": "^1.0.0-rc.12",
-    "puppeteer": "^21.5.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+    "cheerio": "^1.0.0-rc.12"
   }
 }
