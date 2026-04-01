@@ -3,10 +3,10 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 module.exports = {
-    // Bot Info
+    // Bot Identity
     BOT_NAME: 'mBoT',
     BOT_AUTHOR: 'MAR-PD (MASTER)',
-    BOT_VERSION: '4.0.0',
+    BOT_VERSION: '6.0.0',
     
     // Telegram
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
@@ -17,30 +17,36 @@ module.exports = {
     API_HOST: '0.0.0.0',
     
     // Security
-    SESSION_SECRET: process.env.SESSION_SECRET || 'mbot-secret-key-2024',
-    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || 'mbot-encryption-key-32-chars-long!!!',
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || 'mbot-ultimate-powerful-key-2024-32char!!!',
     
-    // TikTok Settings
-    MIN_DELAY: 30,
-    MAX_DELAY: 90,
-    MAX_ACTIONS_PER_DAY: 50,
-    COOLDOWN_MINUTES: 120,
+    // ============ ULTRA POWERFUL SETTINGS ============
+    
+    // Mass Report Settings
+    MASS_REPORT_COUNT: 1000,          // Max reports per mass attack
+    MASS_REPORT_DELAY: 20,            // Seconds between reports
+    CONCURRENT_REPORTS: 10,           // Parallel reports (ULTRA POWERFUL!)
+    
+    // Account Settings
+    MAX_ACTIONS_PER_DAY: 200,          // Maximum per account per day
+    COOLDOWN_MINUTES: 30,              // Cooldown between actions
     SAFE_HOURS_START: 0,
     SAFE_HOURS_END: 6,
     
-    // Mass Report Settings
-    MASS_REPORT_COUNT: 100,
-    MASS_REPORT_DELAY: 60,
+    // Retry Settings
+    MAX_RETRIES: 5,
+    RETRY_DELAY: 5,                    // Seconds between retries
     
-    // Report Reasons
+    // Report Reasons (Multiple reasons for stronger impact)
     REPORT_REASONS: {
-        violent_acts: { name: '⚠️ Violent Acts', priority: 1 },
-        spam: { name: '📢 Spam', priority: 2 },
-        harassment: { name: '💢 Harassment', priority: 1 },
-        hate_speech: { name: '🗣️ Hate Speech', priority: 1 },
-        dangerous_acts: { name: '💀 Dangerous Acts', priority: 1 },
-        misinformation: { name: '📰 Misinformation', priority: 2 },
-        intellectual_property: { name: '©️ IP Violation', priority: 3 }
+        violent_acts: { name: '💀 Violent Acts', priority: 1, code: 'violent' },
+        dangerous_acts: { name: '⚠️ Dangerous Acts', priority: 1, code: 'dangerous' },
+        harassment: { name: '💢 Harassment & Bullying', priority: 1, code: 'harassment' },
+        hate_speech: { name: '🗣️ Hate Speech', priority: 1, code: 'hate' },
+        spam: { name: '📢 Spam', priority: 2, code: 'spam' },
+        misinformation: { name: '📰 Misinformation', priority: 2, code: 'misinfo' },
+        intellectual_property: { name: '©️ Copyright Infringement', priority: 3, code: 'copyright' },
+        self_harm: { name: '💔 Self Harm', priority: 1, code: 'selfharm' },
+        nudity: { name: '🔞 Nudity', priority: 1, code: 'nudity' }
     },
     
     // Disclaimer
@@ -55,7 +61,7 @@ module.exports = {
 • যদি কোন খারাপ কাজ দেখি — আমরা বট অফ করে দিব বা ব্যান করে দেব
 
 ⚠️ *সতর্কতা:*
-• আমাদের বট দিয়ে ভিডিও পোস্ট করলে ভিডিও রিমুভ হয়ে যাইতে পারে
+• আমাদের বট দিয়ে ভিডিও রিপোর্ট করলে ভিডিও রিমুভ হয়ে যাইতে পারে
 • অ্যাকাউন্ট ব্যান হয়ে যাওয়ার সম্ভাবনাও আছে 😩😅
 
 ✅ *সবাই ভালো থাকবেন | ভালো কাজে ইউজ করবেন*
