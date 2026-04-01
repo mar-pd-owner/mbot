@@ -7,15 +7,65 @@ const config = require('./config');
 
 class AccountManager {
     constructor() {
-        this.accountsFile = path.join(__dirname, 'data', 'accounts.json');
-        this.proxiesFile = path.join(__dirname, 'data', 'proxies.json');
-        this.settingsFile = path.join(__dirname, 'data', 'settings.json');
+        this.dataPath = path.join(__dirname, 'data');
+        this.accountsFile = path.join(this.dataPath, 'accounts.json');
+        this.proxiesFile = path.join(this.dataPath, 'proxies.json');
+        this.settingsFile = path.join(this.dataPath, 'settings.json');
+        this.reportsFile = path.join(this.dataPath, 'reports.json');
         
-        this.accounts = [];
-        this.proxies = [];
-        this.settings = {};
-        
+        this.ensureDataDirectory();
         this.loadData();
+        
+        // Auto-reset daily counters at midnight
+        setInterval(() => this.checkAndResetDaily(), 60000);
+    }
+    
+    ensureDataDirectory() {
+        if (!fs.existsSync(this.dataPath)) {
+            fs.mkdirSync(this.dataPath, { recursive: true });
+        }
+    }
+    
+    loadData() {
+        // Load Accounts
+        if (fs.existsSync(this.accountsFile)) {
+            this.accounts = JSON.parse(fs.readFileSync(this.accountsFile, 'utf8'));
+            logger.info(`📧 Loaded ${this.accounts.length} accounts`);
+        } else {
+            this.accounts = [];
+            this.saveAccounts();
+        }
+        
+        // Load Proxies
+        if (fs.existsSync(this.proxiesFile)) {
+            this.proxies = JSON.parse(fs.readFileSync(this.proxiesFile, 'utf8'));
+            logger.info(`🌐 Loaded ${this.proxies.length} proxies`);
+        } else {
+            this.proxies = [];
+            this.saveProxies();
+        }
+        
+        // Load Settings
+        if (fs.existsSync(this.settingsFile)) {
+            this.settings = JSON.parse(fs.readFileSync(this.settingsFile, 'utf8'));
+        } else {
+            this.settings = {
+                total_actions: 0,
+                total_reports: 0,
+                last_reset: new Date().toISOString(),
+                bot_status: 'online',
+                start_time: new Date().toISOString()
+            };
+            this.saveSettings();
+        }
+        
+        // Load Reports History
+        if (fs.existsSync(this.reportsFile)) {
+            this.reports = JSON.parse(fs.readFileSync(this.reportsFile, 'utf8'));
+        } else {
+            this.reports = [];
+            this.saveReports();
+        }
     }
     
     encrypt(text) {
@@ -23,70 +73,31 @@ class AccountManager {
     }
     
     decrypt(encrypted) {
-        const bytes = CryptoJS.AES.decrypt(encrypted, config.ENCRYPTION_KEY);
-        return bytes.toString(CryptoJS.enc.Utf8);
-    }
-    
-    loadData() {
         try {
-            if (fs.existsSync(this.accountsFile)) {
-                const data = fs.readFileSync(this.accountsFile, 'utf8');
-                this.accounts = JSON.parse(data);
-                logger.info(`Loaded ${this.accounts.length} accounts`);
-            }
-        } catch (error) {
-            logger.error(`Error loading accounts: ${error.message}`);
-            this.accounts = [];
-        }
-        
-        try {
-            if (fs.existsSync(this.proxiesFile)) {
-                const data = fs.readFileSync(this.proxiesFile, 'utf8');
-                this.proxies = JSON.parse(data);
-                logger.info(`Loaded ${this.proxies.length} proxies`);
-            }
-        } catch (error) {
-            this.proxies = [];
-        }
-        
-        try {
-            if (fs.existsSync(this.settingsFile)) {
-                const data = fs.readFileSync(this.settingsFile, 'utf8');
-                this.settings = JSON.parse(data);
-            }
-        } catch (error) {
-            this.settings = {
-                total_actions: 0,
-                last_reset: new Date().toISOString(),
-                bot_status: 'online'
-            };
+            const bytes = CryptoJS.AES.decrypt(encrypted, config.ENCRYPTION_KEY);
+            return bytes.toString(CryptoJS.enc.Utf8);
+        } catch {
+            return encrypted;
         }
     }
     
     saveAccounts() {
-        try {
-            fs.writeFileSync(this.accountsFile, JSON.stringify(this.accounts, null, 2));
-            logger.info('Accounts saved successfully');
-        } catch (error) {
-            logger.error(`Error saving accounts: ${error.message}`);
-        }
+        fs.writeFileSync(this.accountsFile, JSON.stringify(this.accounts, null, 2));
     }
     
     saveProxies() {
-        try {
-            fs.writeFileSync(this.proxiesFile, JSON.stringify(this.proxies, null, 2));
-        } catch (error) {
-            logger.error(`Error saving proxies: ${error.message}`);
-        }
+        fs.writeFileSync(this.proxiesFile, JSON.stringify(this.proxies, null, 2));
     }
     
     saveSettings() {
-        try {
-            fs.writeFileSync(this.settingsFile, JSON.stringify(this.settings, null, 2));
-        } catch (error) {
-            logger.error(`Error saving settings: ${error.message}`);
-        }
+        fs.writeFileSync(this.settingsFile, JSON.stringify(this.settings, null, 2));
     }
+    
+    saveReports() {
+        fs.writeFileSync(this.reportsFile, JSON.stringify(this.reports, null, 2));
+    }
+    
+    // ============ ACCOUNT MANAGEMENT ============
     
     addAccount(email, password) {
         const newId = this.accounts.length > 0 ? Math.max(...this.accounts.map(a => a.id)) + 1 : 1;
@@ -107,18 +118,41 @@ class AccountManager {
         
         this.accounts.push(account);
         this.saveAccounts();
-        logger.info(`New account added: ${email}`);
+        logger.info(`✅ Added account: ${email}`);
         
-        return {
-            id: account.id,
-            email: account.email,
-            status: account.status,
-            created_at: account.created_at
-        };
+        return { id: account.id, email: account.email, status: account.status };
+    }
+    
+    addAccountsBulk(accountsList) {
+        const added = [];
+        for (const { email, password } of accountsList) {
+            const result = this.addAccount(email, password);
+            added.push(result);
+        }
+        return added;
+    }
+    
+    removeAccount(id) {
+        const index = this.accounts.findIndex(a => a.id === parseInt(id));
+        if (index !== -1) {
+            const removed = this.accounts.splice(index, 1)[0];
+            this.saveAccounts();
+            logger.info(`🗑️ Removed account: ${removed.email}`);
+            return { success: true, email: removed.email };
+        }
+        return { success: false };
+    }
+    
+    removeAllAccounts() {
+        const count = this.accounts.length;
+        this.accounts = [];
+        this.saveAccounts();
+        logger.info(`🗑️ Removed all ${count} accounts`);
+        return { success: true, removed: count };
     }
     
     getAccount(id) {
-        const account = this.accounts.find(a => a.id === id);
+        const account = this.accounts.find(a => a.id === parseInt(id));
         if (account) {
             return {
                 ...account,
@@ -128,17 +162,27 @@ class AccountManager {
         return null;
     }
     
-    getAvailableAccounts(limit = 10) {
+    getAllAccounts() {
+        return this.accounts.map(a => ({
+            id: a.id,
+            email: a.email,
+            status: a.status,
+            used_today: a.used_today,
+            total_actions: a.total_actions,
+            success_count: a.success_count,
+            fail_count: a.fail_count,
+            success_rate: a.total_actions > 0 ? ((a.success_count / a.total_actions) * 100).toFixed(1) : 0
+        }));
+    }
+    
+    getAvailableAccounts(limit = 500) {
         const now = new Date();
         const currentHour = now.getHours();
         
         const available = this.accounts.filter(account => {
             if (account.status !== 'active') return false;
-            
-            // Daily limit check
             if (account.used_today >= config.MAX_ACTIONS_PER_DAY) return false;
             
-            // Cooldown check
             if (account.last_used) {
                 const lastUsed = new Date(account.last_used);
                 const minutesSinceLastUse = (now - lastUsed) / (1000 * 60);
@@ -150,17 +194,19 @@ class AccountManager {
                 return true;
             }
             
-            // Daytime limit
-            return account.used_today < 30;
+            return account.used_today < 100;
         });
         
         // Sort by least used first (rotation)
         available.sort((a, b) => a.used_today - b.used_today);
         
-        return available.slice(0, limit).map(acc => ({
+        const result = available.slice(0, limit).map(acc => ({
             ...acc,
             password: this.decrypt(acc.password)
         }));
+        
+        logger.info(`📊 Available accounts: ${result.length}/${this.accounts.length}`);
+        return result;
     }
     
     updateAccountUsage(accountId, success) {
@@ -177,13 +223,23 @@ class AccountManager {
                 }
             }
             account.total_actions++;
-            
             this.saveAccounts();
             
-            // Update settings
-            this.settings.total_actions = (this.settings.total_actions || 0) + 1;
+            this.settings.total_actions++;
+            if (success) this.settings.total_reports++;
             this.saveSettings();
         }
+    }
+    
+    updateAccountStatus(id, status) {
+        const account = this.accounts.find(a => a.id === parseInt(id));
+        if (account) {
+            account.status = status;
+            this.saveAccounts();
+            logger.info(`📝 Account ${account.email} status changed to ${status}`);
+            return true;
+        }
+        return false;
     }
     
     resetDailyCounters() {
@@ -196,31 +252,18 @@ class AccountManager {
         this.settings.last_reset = new Date().toISOString();
         this.saveAccounts();
         this.saveSettings();
-        logger.info('Daily counters reset');
+        logger.info('🔄 Daily counters reset');
     }
     
-    getStats() {
-        const total = this.accounts.length;
-        const active = this.accounts.filter(a => a.status === 'active').length;
-        const suspicious = this.accounts.filter(a => a.status === 'suspicious').length;
-        const banned = this.accounts.filter(a => a.status === 'banned').length;
-        const actionsToday = this.accounts.reduce((sum, a) => sum + (a.used_today || 0), 0);
-        const totalActions = this.accounts.reduce((sum, a) => sum + (a.total_actions || 0), 0);
-        const successRate = totalActions > 0 ? 
-            (this.accounts.reduce((sum, a) => sum + (a.success_count || 0), 0) / totalActions * 100).toFixed(2) : 0;
-        
-        return {
-            total,
-            active,
-            suspicious,
-            banned,
-            actions_today: actionsToday,
-            total_actions: totalActions,
-            success_rate: successRate,
-            proxies_available: this.proxies.length,
-            bot_status: this.settings.bot_status || 'online'
-        };
+    checkAndResetDaily() {
+        const lastReset = new Date(this.settings.last_reset);
+        const now = new Date();
+        if (lastReset.getDate() !== now.getDate()) {
+            this.resetDailyCounters();
+        }
     }
+    
+    // ============ PROXY MANAGEMENT ============
     
     addProxy(server, port, username = null, password = null) {
         const newId = this.proxies.length > 0 ? Math.max(...this.proxies.map(p => p.id)) + 1 : 1;
@@ -233,36 +276,89 @@ class AccountManager {
             password: password ? this.encrypt(password) : null,
             is_active: true,
             usage_count: 0,
-            last_used: null
+            last_used: null,
+            created_at: new Date().toISOString()
         };
         
         this.proxies.push(proxy);
         this.saveProxies();
-        logger.info(`New proxy added: ${server}:${port}`);
+        logger.info(`✅ Added proxy: ${server}:${port}`);
         
         return proxy;
-    }
-    
-    getProxy(id) {
-        const proxy = this.proxies.find(p => p.id === id);
-        if (proxy && proxy.is_active) {
-            return {
-                server: proxy.server,
-                port: proxy.port,
-                username: proxy.username,
-                password: proxy.password ? this.decrypt(proxy.password) : null
-            };
-        }
-        return null;
     }
     
     getRandomProxy() {
         const activeProxies = this.proxies.filter(p => p.is_active);
         if (activeProxies.length === 0) return null;
         
-        // Round robin selection
         const proxy = activeProxies[Math.floor(Math.random() * activeProxies.length)];
-        return this.getProxy(proxy.id);
+        return {
+            server: proxy.server,
+            port: proxy.port,
+            username: proxy.username,
+            password: proxy.password ? this.decrypt(proxy.password) : null
+        };
+    }
+    
+    removeProxy(id) {
+        const index = this.proxies.findIndex(p => p.id === parseInt(id));
+        if (index !== -1) {
+            const removed = this.proxies.splice(index, 1)[0];
+            this.saveProxies();
+            logger.info(`🗑️ Removed proxy: ${removed.server}:${removed.port}`);
+            return { success: true };
+        }
+        return { success: false };
+    }
+    
+    // ============ REPORT HISTORY ============
+    
+    addReportRecord(videoUrl, successCount, totalCount, reason) {
+        const record = {
+            id: this.reports.length + 1,
+            video_url: videoUrl,
+            success_count: successCount,
+            total_count: totalCount,
+            reason: reason,
+            timestamp: new Date().toISOString()
+        };
+        this.reports.push(record);
+        this.saveReports();
+        return record;
+    }
+    
+    getRecentReports(limit = 20) {
+        return this.reports.slice(-limit).reverse();
+    }
+    
+    // ============ STATISTICS ============
+    
+    getStats() {
+        const total = this.accounts.length;
+        const active = this.accounts.filter(a => a.status === 'active').length;
+        const suspicious = this.accounts.filter(a => a.status === 'suspicious').length;
+        const banned = this.accounts.filter(a => a.status === 'banned').length;
+        const actionsToday = this.accounts.reduce((sum, a) => sum + (a.used_today || 0), 0);
+        const totalActions = this.accounts.reduce((sum, a) => sum + (a.total_actions || 0), 0);
+        const successRate = totalActions > 0 ? 
+            (this.accounts.reduce((sum, a) => sum + (a.success_count || 0), 0) / totalActions * 100).toFixed(2) : 0;
+        
+        const uptime = Math.floor((new Date() - new Date(this.settings.start_time)) / 1000 / 60 / 60);
+        
+        return {
+            total,
+            active,
+            suspicious,
+            banned,
+            actions_today: actionsToday,
+            total_actions: totalActions,
+            total_reports: this.settings.total_reports,
+            success_rate: successRate,
+            proxies_available: this.proxies.length,
+            bot_status: this.settings.bot_status || 'online',
+            uptime_hours: uptime,
+            last_reset: this.settings.last_reset
+        };
     }
 }
 
