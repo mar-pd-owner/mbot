@@ -1,6 +1,8 @@
 // bot.js
 const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const config = require('./config');
 const logger = require('./logger');
 const AccountManager = require('./account-manager');
@@ -8,41 +10,83 @@ const URLExtractor = require('./url-extractor');
 
 const bot = new Telegraf(config.TELEGRAM_BOT_TOKEN);
 const accountManager = new AccountManager();
-
 const API_URL = `http://${config.API_HOST}:${config.PORT}`;
 
 // ============ MIDDLEWARE ============
 bot.use(async (ctx, next) => {
-    logger.info(`User: ${ctx.from.id} | Command: ${ctx.message?.text || 'unknown'}`);
+    logger.info(`👤 User: ${ctx.from.id} | ${ctx.from.username} | Command: ${ctx.message?.text || 'unknown'}`);
     await next();
 });
 
 // ============ START COMMAND ============
 bot.start(async (ctx) => {
     const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('📊 Stats', 'stats')],
-        [Markup.button.callback('📝 Report', 'report_menu')],
-        [Markup.button.callback('➕ Add Account', 'add_account')],
-        [Markup.button.callback('📋 Accounts List', 'list_accounts')],
-        [Markup.button.callback('⚠️ Disclaimer', 'disclaimer')]
+        [Markup.button.callback('📊 STATS', 'stats'), Markup.button.callback('💀 MASS REPORT', 'mass_report')],
+        [Markup.button.callback('📧 ACCOUNTS', 'accounts_menu'), Markup.button.callback('🌐 PROXIES', 'proxies_menu')],
+        [Markup.button.callback('📜 HISTORY', 'history'), Markup.button.callback('⚠️ DISCLAIMER', 'disclaimer')],
+        [Markup.button.callback('🆘 HELP', 'help')]
     ]);
     
     await ctx.replyWithHTML(`
-🤖 *${config.BOT_NAME} - Professional TikTok Automation Bot* 🤖
-        
+☠️ *${config.BOT_NAME} - ULTIMATE POWERFUL BOT* ☠️
+
 *Author:* ${config.BOT_AUTHOR}
 *Version:* ${config.BOT_VERSION}
+*Status:* 🟢 ONLINE
 
-*Available Commands:*
-/report <url> - Report a video
-/mass <url> [count] - Mass report
-/add <email> <password> - Add new account
-/stats - Show bot stats
+*⚡ Commands:*
+/report <url> - Single report
+/mass <url> [count] - Mass report (up to ${config.MASS_REPORT_COUNT})
+/add <email> <pass> - Add account
 /accounts - List all accounts
+/stats - Bot statistics
+/history - Report history
+/disclaimer - Show disclaimer
+/help - Help menu
+
+*💀 ULTRA POWERFUL MODE ACTIVE 💀*
+    `, keyboard);
+});
+
+// ============ HELP ============
+bot.help(async (ctx) => {
+    await ctx.replyWithHTML(`
+💀 *${config.BOT_NAME} HELP MENU* 💀
+
+*📝 REPORT COMMANDS:*
+/report <url> - Report a single video
+/mass <url> [count] - Mass report with multiple accounts
+Example: /mass https://vt.tiktok.com/xxx 100
+
+*📧 ACCOUNT MANAGEMENT:*
+/add <email> <pass> - Add new account
+/accounts - List all accounts
+/remove <id> - Remove account by ID
+/reset-all - Remove ALL accounts (admin)
+/status <id> <active/suspicious/banned> - Change status
+
+*📊 INFO COMMANDS:*
+/stats - Show bot statistics
+/history - Show recent reports
 /disclaimer - Show disclaimer
 
-⚡ *Bot is ready to use!*
-    `, keyboard);
+*🌐 PROXY MANAGEMENT:*
+/proxy-add <server> <port> - Add proxy
+/proxy-list - List all proxies
+/proxy-remove <id> - Remove proxy
+
+*⚙️ ADMIN COMMANDS:*
+/reset-daily - Reset daily counters
+/broadcast <msg> - Broadcast message
+/stop-bot - Emergency stop
+
+*Supported URLs:*
+• Full: https://www.tiktok.com/@user/video/123456789
+• Short: https://vt.tiktok.com/ZSxxxxx/
+• Short: https://vm.tiktok.com/ZSxxxxx/
+
+*⚠️ USE WISELY!* @${config.BOT_AUTHOR}
+    `);
 });
 
 // ============ DISCLAIMER ============
@@ -59,24 +103,29 @@ bot.action('disclaimer', async (ctx) => {
 bot.command('stats', async (ctx) => {
     try {
         const response = await axios.get(`${API_URL}/api/stats`);
-        const stats = response.data;
+        const s = response.data;
         
         await ctx.replyWithHTML(`
-📊 *${config.BOT_NAME} Statistics* 📊
+💀 *${config.BOT_NAME} STATISTICS* 💀
 
-┌ *Accounts*
-├ 📧 Total: ${stats.total}
-├ ✅ Active: ${stats.active}
-├ ⚠️ Suspicious: ${stats.suspicious}
-├ ❌ Banned: ${stats.banned}
-└ 📈 Actions Today: ${stats.actions_today}
+┌ *📧 ACCOUNTS*
+├ ✅ Active: ${s.active}
+├ ⚠️ Suspicious: ${s.suspicious}
+├ ❌ Banned: ${s.banned}
+└ 📈 Total: ${s.total}
 
-┌ *Performance*
-├ 🔄 Total Actions: ${stats.total_actions}
-├ 📊 Success Rate: ${stats.success_rate}%
-└ 🌐 Proxies: ${stats.proxies_available}
+┌ *⚡ ACTIONS*
+├ 📊 Today: ${s.actions_today}
+├ 🔄 Total: ${s.total_actions}
+├ 📝 Reports: ${s.total_reports}
+└ 📈 Success Rate: ${s.success_rate}%
 
-*Status:* ${stats.bot_status === 'online' ? '🟢 ONLINE' : '🔴 OFFLINE'}
+┌ *🌐 SYSTEM*
+├ 🖥️ Proxies: ${s.proxies_available}
+├ ⏱️ Uptime: ${s.uptime_hours} hours
+└ 🟢 Status: ${s.bot_status === 'online' ? 'ONLINE' : 'OFFLINE'}
+
+*💀 ULTRA POWERFUL MODE ACTIVE* 💀
         `);
     } catch (error) {
         await ctx.reply('❌ Failed to fetch stats. API may be offline.');
@@ -93,7 +142,7 @@ bot.command('add', async (ctx) => {
     const args = ctx.message.text.split(' ');
     
     if (args.length < 3) {
-        await ctx.reply('❌ Usage: /add <email> <password>\nExample: /add user@gmail.com pass123');
+        await ctx.reply('❌ Usage: /add <email> <password>\n\nExample: /add user@gmail.com pass123');
         return;
     }
     
@@ -104,14 +153,16 @@ bot.command('add', async (ctx) => {
         const response = await axios.post(`${API_URL}/api/account/add`, { email, password });
         
         if (response.data.success) {
+            const stats = accountManager.getStats();
             await ctx.replyWithHTML(`
-✅ *Account Added Successfully!*
+✅ *ACCOUNT ADDED SUCCESSFULLY!*
 
 📧 Email: ${email}
 🆔 ID: ${response.data.account.id}
 📅 Created: ${response.data.account.created_at}
 
-*Total Accounts:* ${accountManager.getStats().total}
+📊 *Total Accounts:* ${stats.total}
+💀 *Ready for mass report!* 💀
             `);
             logger.info(`New account added by ${ctx.from.id}: ${email}`);
         } else {
@@ -122,12 +173,119 @@ bot.command('add', async (ctx) => {
     }
 });
 
+// ============ ACCOUNTS LIST ============
+bot.command('accounts', async (ctx) => {
+    try {
+        const response = await axios.get(`${API_URL}/api/accounts`);
+        const { accounts, total } = response.data;
+        
+        if (accounts.length === 0) {
+            await ctx.reply('📭 No accounts found. Use /add to add accounts.');
+            return;
+        }
+        
+        let message = `📋 *ACCOUNT LIST* (${total} total)\n\n`;
+        
+        for (const acc of accounts.slice(0, 30)) {
+            const statusEmoji = acc.status === 'active' ? '✅' : acc.status === 'suspicious' ? '⚠️' : '❌';
+            message += `${statusEmoji} *ID ${acc.id}* - ${acc.email}\n`;
+            message += `   └ Actions: ${acc.used_today}/day | Success: ${acc.success_rate}% | Total: ${acc.total_actions}\n`;
+        }
+        
+        if (accounts.length > 30) {
+            message += `\n*...and ${accounts.length - 30} more accounts*`;
+        }
+        
+        message += `\n\n💀 *Use /remove <id> to remove account* 💀`;
+        
+        await ctx.replyWithHTML(message);
+    } catch (error) {
+        await ctx.reply(`❌ Error: ${error.message}`);
+    }
+});
+
+bot.action('accounts_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('📋 LIST ALL', 'list_accounts')],
+        [Markup.button.callback('➕ ADD ACCOUNT', 'add_account')],
+        [Markup.button.callback('🗑️ REMOVE ALL', 'remove_all_confirm')],
+        [Markup.button.callback('◀️ BACK', 'back_main')]
+    ]);
+    await ctx.reply('📧 *Account Management*', { parse_mode: 'Markdown', ...keyboard });
+});
+
+bot.action('list_accounts', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('/accounts');
+});
+
 bot.action('add_account', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply('Please use: /add email password\n\nExample: /add user@gmail.com pass123');
 });
 
-// ============ REPORT ============
+bot.action('remove_all_confirm', async (ctx) => {
+    await ctx.answerCbQuery();
+    const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('✅ YES, REMOVE ALL', 'remove_all_execute')],
+        [Markup.button.callback('❌ CANCEL', 'accounts_menu')]
+    ]);
+    await ctx.reply('⚠️ *WARNING!* This will remove ALL accounts. Are you sure?', { parse_mode: 'Markdown', ...keyboard });
+});
+
+bot.action('remove_all_execute', async (ctx) => {
+    await ctx.answerCbQuery();
+    const result = accountManager.removeAllAccounts();
+    await ctx.reply(`🗑️ Removed ${result.removed} accounts successfully!`);
+});
+
+// ============ REMOVE ACCOUNT ============
+bot.command('remove', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    
+    if (args.length < 2) {
+        await ctx.reply('❌ Usage: /remove <account_id>\n\nUse /accounts to see IDs');
+        return;
+    }
+    
+    const id = args[1];
+    const result = accountManager.removeAccount(id);
+    
+    if (result.success) {
+        await ctx.reply(`✅ Account ${result.email} removed successfully!`);
+    } else {
+        await ctx.reply(`❌ Account with ID ${id} not found.`);
+    }
+});
+
+// ============ UPDATE ACCOUNT STATUS ============
+bot.command('status', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    
+    if (args.length < 3) {
+        await ctx.reply('❌ Usage: /status <id> <active|suspicious|banned>\n\nExample: /status 5 suspicious');
+        return;
+    }
+    
+    const id = args[1];
+    const status = args[2];
+    
+    if (!['active', 'suspicious', 'banned'].includes(status)) {
+        await ctx.reply('❌ Status must be: active, suspicious, or banned');
+        return;
+    }
+    
+    const result = accountManager.updateAccountStatus(id, status);
+    
+    if (result) {
+        await ctx.reply(`✅ Account ID ${id} status updated to ${status}`);
+    } else {
+        await ctx.reply(`❌ Account ID ${id} not found.`);
+    }
+});
+
+// ============ SINGLE REPORT ============
 bot.command('report', async (ctx) => {
     const args = ctx.message.text.split(' ');
     
@@ -148,13 +306,14 @@ bot.command('report', async (ctx) => {
                 statusMsg.message_id,
                 null,
                 `
-✅ *Report Submitted Successfully!*
+✅ *REPORT SUBMITTED SUCCESSFULLY!*
 
 🎥 Video: ${response.data.video_url}
 👤 Account: ${response.data.account}
 ⚠️ Reason: ${response.data.reason}
 
 *Status:* Report has been sent to TikTok moderation.
+*Impact:* Video is being reviewed.
                 `,
                 { parse_mode: 'Markdown' }
             );
@@ -163,7 +322,7 @@ bot.command('report', async (ctx) => {
                 ctx.chat.id,
                 statusMsg.message_id,
                 null,
-                `❌ Report Failed!\n\nError: ${response.data.error || 'Unknown error'}`
+                `❌ *REPORT FAILED!*\n\nError: ${response.data.error || 'Unknown error'}`
             );
         }
     } catch (error) {
@@ -171,82 +330,102 @@ bot.command('report', async (ctx) => {
             ctx.chat.id,
             statusMsg.message_id,
             null,
-            `❌ Error: ${error.response?.data?.error || error.message}`
+            `❌ *ERROR:* ${error.response?.data?.error || error.message}`
         );
     }
 });
 
-// ============ MASS REPORT ============
+// ============ MASS REPORT - POWERFUL ============
 bot.command('mass', async (ctx) => {
     const args = ctx.message.text.split(' ');
     
     if (args.length < 2) {
-        await ctx.reply('❌ Usage: /mass <url> [count]\n\nExample: /mass https://vt.tiktok.com/xxx 50');
+        await ctx.reply('❌ Usage: /mass <url> [count]\n\nExample: /mass https://vt.tiktok.com/xxx 100\n\nMax count: ' + config.MASS_REPORT_COUNT);
         return;
     }
     
     const url = args[1];
-    const count = args[2] ? parseInt(args[2]) : 50;
+    const count = args[2] ? Math.min(parseInt(args[2]), config.MASS_REPORT_COUNT) : config.MASS_REPORT_COUNT;
     
-    if (count > 200) {
-        await ctx.reply('❌ Maximum 200 reports per mass report.');
+    if (count > config.MASS_REPORT_COUNT) {
+        await ctx.reply(`❌ Maximum ${config.MASS_REPORT_COUNT} reports per mass attack.`);
         return;
     }
     
-    const statusMsg = await ctx.reply(`⚠️ Starting mass report with ${count} accounts...\n\nThis may take several minutes.`);
+    const stats = accountManager.getStats();
+    if (stats.active < 10) {
+        await ctx.reply(`⚠️ Not enough active accounts! Need at least 10. Current: ${stats.active}`);
+        return;
+    }
+    
+    const statusMsg = await ctx.reply(`💀 *STARTING MASS REPORT ATTACK!* 💀\n\n📊 Target: ${url}\n👥 Accounts: ${Math.min(count, stats.active)}\n⏱️ Estimated time: ~${Math.ceil(Math.min(count, stats.active) * config.MASS_REPORT_DELAY / 60)} minutes\n\n*Please wait...*`, { parse_mode: 'Markdown' });
     
     try {
         const response = await axios.post(`${API_URL}/api/mass-report`, { url, count });
+        const r = response.data;
+        
+        const resultMessage = `
+💀 *MASS REPORT COMPLETED!* 💀
+
+🎥 Video: ${r.video_url}
+📊 Requested: ${r.total_requested}
+✅ Successful: ${r.successful}
+❌ Failed: ${r.failed}
+📈 Success Rate: ${r.success_rate}%
+
+*IMPACT ANALYSIS:*
+${r.successful > 100 ? '⚠️ EXTREME - Video will likely be removed within hours!' : 
+  r.successful > 50 ? '⚠️ HIGH - Video is heavily flagged!' :
+  r.successful > 20 ? '⚠️ MEDIUM - Video has multiple reports!' :
+  '⚠️ LOW - More reports needed!'}
+
+*Total Reports Sent:* ${r.successful}
+*Accounts Used:* ${r.total_executed}
+
+💀 *ULTRA POWERFUL ATTACK EXECUTED!* 💀
+        `;
         
         await ctx.telegram.editMessageText(
             ctx.chat.id,
             statusMsg.message_id,
             null,
-            `
-💀 *Mass Report Completed* 💀
-
-🎥 Video: ${response.data.video_url}
-📊 Requested: ${response.data.total_requested}
-✅ Successful: ${response.data.successful}
-❌ Failed: ${response.data.total_executed - response.data.successful}
-
-*Success Rate:* ${((response.data.successful / response.data.total_executed) * 100).toFixed(1)}%
-
-${response.data.successful > 0 ? '⚠️ Video has been flagged multiple times!' : '⚠️ No reports were submitted.'}
-            `,
+            resultMessage,
             { parse_mode: 'Markdown' }
         );
+        
     } catch (error) {
         await ctx.telegram.editMessageText(
             ctx.chat.id,
             statusMsg.message_id,
             null,
-            `❌ Mass report failed: ${error.response?.data?.error || error.message}`
+            `❌ *MASS REPORT FAILED!*\n\nError: ${error.response?.data?.error || error.message}`
         );
     }
 });
 
-// ============ ACCOUNTS LIST ============
-bot.command('accounts', async (ctx) => {
+bot.action('mass_report', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('💀 *Mass Report Command* 💀\n\nUse: /mass <url> [count]\n\nExample: /mass https://vt.tiktok.com/xxx 100\n\nMax count: ' + config.MASS_REPORT_COUNT, { parse_mode: 'Markdown' });
+});
+
+// ============ REPORT HISTORY ============
+bot.command('history', async (ctx) => {
     try {
-        const response = await axios.get(`${API_URL}/api/accounts`);
-        const { accounts, total } = response.data;
+        const response = await axios.get(`${API_URL}/api/reports?limit=10`);
+        const { reports } = response.data;
         
-        if (accounts.length === 0) {
-            await ctx.reply('📭 No accounts found. Use /add to add accounts.');
+        if (reports.length === 0) {
+            await ctx.reply('📭 No reports yet. Use /mass or /report to start.');
             return;
         }
         
-        let message = `📋 *Account List* (${total} total)\n\n`;
+        let message = `📜 *RECENT REPORTS* (last ${reports.length})\n\n`;
         
-        for (const acc of accounts.slice(0, 20)) {
-            const statusEmoji = acc.status === 'active' ? '✅' : acc.status === 'suspicious' ? '⚠️' : '❌';
-            message += `${statusEmoji} *${acc.email}*\n`;
-            message += `   └ Actions: ${acc.used_today}/day | Success: ${acc.success_rate}%\n`;
-        }
-        
-        if (accounts.length > 20) {
-            message += `\n*...and ${accounts.length - 20} more accounts*`;
+        for (const r of reports) {
+            const date = new Date(r.timestamp).toLocaleString();
+            message += `┌ *ID ${r.id}* - ${date}\n`;
+            message += `├ 🎥 ${r.video_url.substring(0, 50)}...\n`;
+            message += `└ ✅ ${r.success_count}/${r.total_count} successful\n\n`;
         }
         
         await ctx.replyWithHTML(message);
@@ -255,76 +434,61 @@ bot.command('accounts', async (ctx) => {
     }
 });
 
-bot.action('list_accounts', async (ctx) => {
+bot.action('history', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('/accounts');
+    await ctx.reply('/history');
 });
 
-// ============ REPORT MENU ============
-bot.action('report_menu', async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.reply(
-        '📝 *Report a Video*\n\nPlease send the video URL in one of these formats:\n\n' +
-        '• Full URL: `https://www.tiktok.com/@user/video/123456789`\n' +
-        '• Short URL: `https://vt.tiktok.com/ZSxxxxx/`\n\n' +
-        'Use: `/report <url>`\n' +
-        'Use: `/mass <url> [count]` for mass report',
-        { parse_mode: 'Markdown' }
-    );
-});
-
-// ============ EXTRACT URL (Helper) ============
-bot.command('extract', async (ctx) => {
+// ============ PROXY MANAGEMENT ============
+bot.command('proxy-add', async (ctx) => {
     const args = ctx.message.text.split(' ');
     
-    if (args.length < 2) {
-        await ctx.reply('❌ Usage: /extract <short_url>');
+    if (args.length < 3) {
+        await ctx.reply('❌ Usage: /proxy-add <server> <port> [username] [password]\n\nExample: /proxy-add 192.168.1.1 8080');
         return;
     }
     
-    const result = await URLExtractor.extractTikTokUrl(args[1]);
+    const server = args[1];
+    const port = parseInt(args[2]);
+    const username = args[3] || null;
+    const password = args[4] || null;
     
-    if (result.success) {
-        await ctx.replyWithHTML(`
-🔗 *URL Extracted*
-
-*Short URL:* ${result.shortUrl}
-*Full URL:* ${result.fullUrl}
-*Video ID:* ${result.videoId || 'N/A'}
-        `);
-    } else {
-        await ctx.reply(`❌ Failed to extract: ${result.error}`);
-    }
+    const proxy = accountManager.addProxy(server, port, username, password);
+    await ctx.reply(`✅ Proxy added: ${server}:${port}`);
 });
 
-// ============ HELP ============
-bot.help(async (ctx) => {
-    await ctx.replyWithHTML(`
-🤖 *${config.BOT_NAME} Help Menu* 🤖
+bot.command('proxy-list', async (ctx) => {
+    const proxies = accountManager.proxies;
+    
+    if (proxies.length === 0) {
+        await ctx.reply('🌐 No proxies configured.');
+        return;
+    }
+    
+    let message = `🌐 *PROXY LIST* (${proxies.length})\n\n`;
+    for (const p of proxies) {
+        message += `┌ *ID ${p.id}* - ${p.server}:${p.port}\n`;
+        message += `└ Status: ${p.is_active ? '✅ Active' : '❌ Inactive'} | Used: ${p.usage_count || 0}\n\n`;
+    }
+    
+    await ctx.replyWithHTML(message);
+});
 
-*Commands:*
-/start - Show welcome message
-/help - Show this help menu
-/stats - Show bot statistics
-/add <email> <pass> - Add new account
-/accounts - List all accounts
-/report <url> - Report a video
-/mass <url> [count] - Mass report (max 200)
-/extract <url> - Extract full URL from short URL
-/disclaimer - Show disclaimer
-
-*Supported URL Formats:*
-• Full: https://www.tiktok.com/@user/video/123456789
-• Short: https://vt.tiktok.com/ZSxxxxx/
-• Short: https://vm.tiktok.com/ZSxxxxx/
-
-*Need Help?* Contact @${config.BOT_AUTHOR}
-    `);
+bot.command('proxy-remove', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    
+    if (args.length < 2) {
+        await ctx.reply('❌ Usage: /proxy-remove <id>');
+        return;
+    }
+    
+    const result = accountManager.removeProxy(args[1]);
+    await ctx.reply(result.success ? '✅ Proxy removed!' : '❌ Proxy not found');
 });
 
 // ============ ADMIN COMMANDS ============
 if (config.ADMIN_IDS) {
-    bot.command('reset', async (ctx) => {
+    bot.command('reset-daily', async (ctx) => {
         if (!config.ADMIN_IDS.includes(ctx.from.id)) {
             await ctx.reply('⛔ Admin only command.');
             return;
@@ -351,10 +515,57 @@ if (config.ADMIN_IDS) {
             return;
         }
         
-        // Broadcast logic here
+        // This would need to store user IDs, but for now just confirm
         await ctx.reply(`📢 Broadcast sent: ${message}`);
     });
+    
+    bot.command('stop-bot', async (ctx) => {
+        if (!config.ADMIN_IDS.includes(ctx.from.id)) {
+            await ctx.reply('⛔ Admin only command.');
+            return;
+        }
+        
+        await ctx.reply('🛑 Bot is stopping...');
+        process.exit(0);
+    });
 }
+
+// ============ BACK TO MAIN ============
+bot.action('back_main', async (ctx) => {
+    await ctx.answerCbQuery();
+    const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('📊 STATS', 'stats'), Markup.button.callback('💀 MASS REPORT', 'mass_report')],
+        [Markup.button.callback('📧 ACCOUNTS', 'accounts_menu'), Markup.button.callback('🌐 PROXIES', 'proxies_menu')],
+        [Markup.button.callback('📜 HISTORY', 'history'), Markup.button.callback('⚠️ DISCLAIMER', 'disclaimer')],
+        [Markup.button.callback('🆘 HELP', 'help')]
+    ]);
+    await ctx.reply(`💀 *${config.BOT_NAME} - MAIN MENU* 💀`, { parse_mode: 'Markdown', ...keyboard });
+});
+
+bot.action('proxies_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('📋 LIST', 'proxy_list')],
+        [Markup.button.callback('➕ ADD', 'proxy_add')],
+        [Markup.button.callback('◀️ BACK', 'back_main')]
+    ]);
+    await ctx.reply('🌐 *Proxy Management*', { parse_mode: 'Markdown', ...keyboard });
+});
+
+bot.action('proxy_list', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('/proxy-list');
+});
+
+bot.action('proxy_add', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Please use: /proxy-add <server> <port>\n\nExample: /proxy-add 192.168.1.1 8080');
+});
+
+bot.action('help', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('/help');
+});
 
 // ============ ERROR HANDLER ============
 bot.catch((err, ctx) => {
