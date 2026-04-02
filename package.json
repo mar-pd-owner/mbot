@@ -1,12 +1,11 @@
 {
-  "name": "mbot-ultimate-powerful",
+  "name": "mbot-free-mass-report",
   "version": "6.0.0",
-  "description": "Ultimate Powerful TikTok Mass Report Bot by MAR-PD",
+  "description": "Ultimate Free TikTok Mass Report Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "bot": "node bot.js",
-    "dev": "nodemon server.js"
+    "bot": "node bot.js"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -15,10 +14,6 @@
     "axios": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "node-cron": "^3.0.3",
-    "express-rate-limit": "^7.1.5",
-    "winston": "^3.11.0",
-    "crypto-js": "^4.2.0",
-    "cheerio": "^1.0.0-rc.12"
+    "node-cron": "^3.0.3"
   }
 }
