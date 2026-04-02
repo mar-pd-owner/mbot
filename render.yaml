@@ -2,7 +2,7 @@ services:
   - type: web
     name: mbot-ultimate
     runtime: image
-    repo: https://github.com/your-username/mbot
+    repo: https://github.com/mar-pd-owner/mbot
     branch: main
     plan: free
     envVars:
