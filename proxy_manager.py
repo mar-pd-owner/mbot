@@ -1,4 +1,3 @@
-// proxy-manager.js
 const axios = require('axios');
 const fs = require('fs');
 const config = require('./config');
