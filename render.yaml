@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: mbot-ultimate
+    name: mbot-api
     runtime: image
-    repo: https://github.com/mar-pd-owner/mbot
+    repo: https://github.com/your-username/mbot
     branch: main
     plan: free
     envVars:
@@ -12,6 +12,5 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         generateValue: true
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile.api
     healthCheckPath: /health
-    autoDeploy: true
